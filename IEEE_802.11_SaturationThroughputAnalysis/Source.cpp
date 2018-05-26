@@ -48,9 +48,8 @@ void main() {
 	int Packet = MAC_header + PHY_header + PayLoad;			// bits
 	int ACK = 112 + PHY_header;								// bits
 
-
-	double Ts = (float)(Packet + SIFS + ACK + DIFS + 2 * prop_delay) / slot_time;
-	double Tc = (float)(Packet + DIFS + prop_delay) / slot_time;
+	double Ts = Packet + SIFS + prop_delay + ACK + DIFS + prop_delay;
+	double Tc = Packet + DIFS + prop_delay;
 
 	// Set the window size and stage number by typing inputs
 	int W = 32;
@@ -66,21 +65,13 @@ void main() {
 	for (int n = 5; n <= 50; n++) {
 		// P is the probability that transmitted packet collide
 		double P = rootOfCollisionProbability(W, m, n);
-
 		// tau is probability that a station transmits in a generic slot time
 		double tau = 2.0f * (1.0f - 2.0f * P) / ((1.0f - 2.0f * P) * (W + 1.0f) + P * W *(1.0f - std::pow((2.0f * P), m)));
-
 		// Ptr is that in a slot time there is at least one transmission
 		double Ptr = 1.0f - std::pow((1.0f - tau), n);
-
 		// Ps is the probability that a transmission is successful
-		double Ps = n * tau * (std::pow((1.0f - tau), (n - 1))) / Ptr;
-
-		// ETX is the number of consecutive idle slots between two consecutive transmissions on the channel
-		double E_Idle = 1.0f / Ptr - 1.0f;
-
-		// Throughput = Ps * E[P] / (ETX + Ps * Ts + (1 - Ps) * Tc)
-		throughput[n - 5] = Ps * (PayLoad / slot_time) / (E_Idle + Ps * Ts + (1.0f - Ps) * Tc);
+		double Ps = n * tau * (std::pow((1.0f - tau), (n - 1))) / Ptr;	
+		throughput[n - 5] = Ps * Ptr * PayLoad / ((1 - Ptr) * slot_time + Ptr * Ps * Ts + Ptr * (1.0f - Ps) * Tc);
 	}
 
 
@@ -156,7 +147,6 @@ void main() {
 			}
 		}
 		Simulation_throughput[num_station - 5] = (float)suc_pkt * (PayLoad) / sim_time;
-		std::cout << num_station - 5 << "\t" << Simulation_throughput[num_station - 5] << "\t" << throughput[num_station - 5] << "\n";
 	}
 
 
