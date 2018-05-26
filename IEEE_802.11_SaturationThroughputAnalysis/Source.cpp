@@ -20,12 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-
 #include <iostream>
 #include <vector>
 #include <algorithm>
 
-#define EPSILON 0.00000001f
+#define EPSILON 0.00000001
 
 double collisionProbability(double p, int W, int m, int n);
 double rootOfCollisionProbability(int W, int m, int n);
@@ -58,14 +57,14 @@ void main() {
 	// Set the window size and stage number by typing inputs
 	int W = 32;
 	int m = 3;
-	std::cout << "Minimum backoff window size: (in slot time)\n";
-	std::cin >> W;
-	std::cout << "Maximum stage number: \n";
-	std::cin >> m;
+	//std::cout << "Minimum backoff window size: (in slot time)\n";
+	//std::cin >> W;
+	//std::cout << "Maximum stage number: \n";
+	//std::cin >> m;
 
-	// Computation
+	// Computation Bianchi Throughput Saturation Basic Model
 	std::cout << "Computation Bianchi Throughput Saturation Basic Model...\n";
-	double throughput[50] = {};
+	double ComputationalBasicModelThroughput[50] = {};
 
 	for (int n = 5; n <= 50; n++) {
 		// P is the probability that transmitted packet collide
@@ -76,76 +75,97 @@ void main() {
 		double Ptr = 1.0f - std::pow((1.0f - tau), n);
 		// Ps is the probability that a transmission is successful
 		double Ps = n * tau * (std::pow((1.0f - tau), (n - 1))) / Ptr;	
-		throughput[n - 5] = Ps * Ptr * PayLoad / ((1 - Ptr) * slot_time + Ptr * Ps * Ts_Basic + Ptr * (1.0f - Ps) * Tc_Basic);
+		ComputationalBasicModelThroughput[n - 5] = Ps * Ptr * PayLoad / ((1 - Ptr) * slot_time + Ptr * Ps * Ts_Basic + Ptr * (1.0f - Ps) * Tc_Basic);
 	}
-	std::cout << "\tDone\n\n";
-
+	std::cout << "\n\tDone\n\n";
 	
 	// Simulation
 	std::cout << "Simulating Bianchi Throughput Saturation Basic Model...\n";
-	long sim_time = 0;
-	double Simulation_throughput[50] = {};
-	std::vector<long> station_stage;
-	std::vector<long> next_tran_time;
+	long Total_Simulation_Time = 0;
+	double SimulationBasicModelThroughput[50] = {};
+	std::vector<long> Station_Stage;
+	std::vector<long> Station_Backoff_Time;
 
 	for (int num_station = 5; num_station <= 50; num_station++) {
-		long suc_pkt = 0;
-		long collision_pkt = 0;
-		station_stage.resize(num_station, 0);	
-		next_tran_time.resize(num_station, 0);
+		long Successful_Packet_Transmit_Count = 0;
+		long Collided_Packet_Count = 0;
+		Station_Stage.resize(num_station, 0);
+		Station_Backoff_Time.resize(num_station, 0);
 
 		// initial backoff time
 		for (int i = 0; i < num_station; i++) {
-			station_stage[i] = 0;
-			next_tran_time[i] = DIFS + std::floor(W * std::rand() / RAND_MAX) * slot_time;
+			Station_Stage[i] = 0;
+			Station_Backoff_Time[i] = DIFS + std::floor(W * std::rand() / RAND_MAX) * slot_time;
 		}
 
-		while (suc_pkt < 100000) {
-			long tran_time = *std::min_element (next_tran_time.begin(), next_tran_time.end());
-			long no_tran = 0;
-			for (int i = 0; i < next_tran_time.size(); i++) {
-				if (tran_time == next_tran_time[i]) {
-					no_tran++;
+		while (Successful_Packet_Transmit_Count < 100000) {
+			long Min_Station_Backoff_Time = *std::min_element(Station_Backoff_Time.begin(), Station_Backoff_Time.end());
+			int Simultaneous_Tranmit_Count = 0;
+			for (int i = 0; i < Station_Backoff_Time.size(); i++) {
+				if (Min_Station_Backoff_Time == Station_Backoff_Time[i]) {
+					Simultaneous_Tranmit_Count++;
 				}
 			}
 
 			// sucessful reansition
-			if (no_tran == 1) {
-				suc_pkt++;
+			if (Simultaneous_Tranmit_Count == 1) {
+				Successful_Packet_Transmit_Count++;
 				for (int i = 0; i < num_station; i++) {
 					// uniform backoff at stage 0
-					if (next_tran_time[i] == tran_time) {
-						if (suc_pkt == 100000) {
-							sim_time = next_tran_time[i] + Packet + SIFS + ACK + DIFS;
+					if (Station_Backoff_Time[i] == Min_Station_Backoff_Time) {
+						if (Successful_Packet_Transmit_Count == 100000) {
+							Total_Simulation_Time = Station_Backoff_Time[i] + Packet + SIFS + ACK + DIFS;
 						}
-						station_stage[i] = 0;
-						next_tran_time[i] = next_tran_time[i] + Packet + SIFS + ACK + DIFS + floor(W * std::rand() / RAND_MAX) * slot_time;
+						Station_Stage[i] = 0;
+						Station_Backoff_Time[i] = Station_Backoff_Time[i] + Packet + SIFS + ACK + DIFS + floor(W * std::rand() / RAND_MAX) * slot_time;
 					}
 					// stop counting while the channel is busy
 					else {
-						next_tran_time[i] = next_tran_time[i] + Packet + SIFS + ACK + DIFS;
+						Station_Backoff_Time[i] = Station_Backoff_Time[i] + Packet + SIFS + ACK + DIFS;
 					}
 				}
 			}
 			else {
-				collision_pkt++;
+				Collided_Packet_Count++;
 				for (int i = 0; i < num_station; i++) {
 					// uniform backoff at next stage
-					if (next_tran_time[i] == tran_time) {
-						if (station_stage[i] < m) {
-							station_stage[i]++;
+					if (Station_Backoff_Time[i] == Min_Station_Backoff_Time) {
+						if (Station_Stage[i] < m) {
+							Station_Stage[i]++;
 						}
-						next_tran_time[i] = next_tran_time[i] + Packet + DIFS + floor(std::pow(2.0f, station_stage[i]) * W * std::rand() / RAND_MAX) * slot_time;
+						Station_Backoff_Time[i] = Station_Backoff_Time[i] + Packet + DIFS + floor(std::pow(2.0f, Station_Stage[i]) * W * std::rand() / RAND_MAX) * slot_time;
 					}
 					else {
-						next_tran_time[i] = next_tran_time[i] + Packet + DIFS;
+						Station_Backoff_Time[i] = Station_Backoff_Time[i] + Packet + DIFS;
 					}
 				}
 			}
 		}
-		Simulation_throughput[num_station - 5] = (double)suc_pkt * PayLoad / sim_time;
+		SimulationBasicModelThroughput[num_station - 5] = (double)Successful_Packet_Transmit_Count * PayLoad / Total_Simulation_Time;
 	}
 	std::cout << "\tDone\n\n";
+
+
+
+	//// Computation Bianchi Throughput Saturation Basic Model
+	//std::cout << "Computation Bianchi Throughput Saturation RTS/CTS Model...\n";
+	//double ComputationalRTSModelThroughput[50] = {};
+
+	//for (int n = 5; n <= 50; n++) {
+	//	// P is the probability that transmitted packet collide
+	//	double P = rootOfCollisionProbability(W, m, n);
+	//	// tau is probability that a station transmits in a generic slot time
+	//	double tau = 2.0f * (1.0f - 2.0f * P) / ((1.0f - 2.0f * P) * (W + 1.0f) + P * W *(1.0f - std::pow((2.0f * P), m)));
+	//	// Ptr is that in a slot time there is at least one transmission
+	//	double Ptr = 1.0f - std::pow((1.0f - tau), n);
+	//	// Ps is the probability that a transmission is successful
+	//	double Ps = n * tau * (std::pow((1.0f - tau), (n - 1))) / Ptr;
+	//	ComputationalRTSModelThroughput[n - 5] = Ps * Ptr * PayLoad / ((1 - Ptr) * slot_time + Ptr * Ps * Ts_RTS + Ptr * (1.0f - Ps) * Tc_RTS);
+	//}
+	//std::cout << "\n\tDone\n\n";
+
+
+
 
 	//Plot the results
 	std::vector<float> x;
@@ -153,8 +173,8 @@ void main() {
 
 	for (int i = 5; i <= 50; i++) {
 		x.push_back(i);
-		y1.push_back(throughput[i - 5]);
-		y2.push_back(Simulation_throughput[i - 5]);
+		y1.push_back(ComputationalBasicModelThroughput[i - 5]);
+		y2.push_back(SimulationBasicModelThroughput[i - 5]);
 	}
 
 	FILE * gp = _popen("gnuplot", "w");
