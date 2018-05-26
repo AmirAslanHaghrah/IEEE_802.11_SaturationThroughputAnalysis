@@ -57,10 +57,10 @@ void main() {
 	// Set the window size and stage number by typing inputs
 	int W = 32;
 	int m = 3;
-	//std::cout << "Minimum backoff window size: (in slot time)\n";
-	//std::cin >> W;
-	//std::cout << "Maximum stage number: \n";
-	//std::cin >> m;
+	std::cout << "Minimum backoff window size: (in slot time)\n";
+	std::cin >> W;
+	std::cout << "Maximum stage number: \n";
+	std::cin >> m;
 
 	// Computation Bianchi Throughput Saturation Basic Model
 	std::cout << "Computation Bianchi Throughput Saturation Basic Model...\n";
@@ -86,14 +86,14 @@ void main() {
 	std::vector<long> Station_Stage;
 	std::vector<long> Station_Backoff_Time;
 
-	for (int num_station = 5; num_station <= 50; num_station++) {
+	for (int station = 5; station <= 50; station++) {
 		long Successful_Packet_Transmit_Count = 0;
 		long Collided_Packet_Count = 0;
-		Station_Stage.resize(num_station, 0);
-		Station_Backoff_Time.resize(num_station, 0);
+		Station_Stage.resize(station, 0);
+		Station_Backoff_Time.resize(station, 0);
 
 		// initial backoff time
-		for (int i = 0; i < num_station; i++) {
+		for (int i = 0; i < station; i++) {
 			Station_Stage[i] = 0;
 			Station_Backoff_Time[i] = DIFS + std::floor(W * std::rand() / RAND_MAX) * slot_time;
 		}
@@ -110,7 +110,7 @@ void main() {
 			// sucessful reansition
 			if (Simultaneous_Tranmit_Count == 1) {
 				Successful_Packet_Transmit_Count++;
-				for (int i = 0; i < num_station; i++) {
+				for (int i = 0; i < station; i++) {
 					// uniform backoff at stage 0
 					if (Station_Backoff_Time[i] == Min_Station_Backoff_Time) {
 						if (Successful_Packet_Transmit_Count == 100000) {
@@ -127,7 +127,7 @@ void main() {
 			}
 			else {
 				Collided_Packet_Count++;
-				for (int i = 0; i < num_station; i++) {
+				for (int i = 0; i < station; i++) {
 					// uniform backoff at next stage
 					if (Station_Backoff_Time[i] == Min_Station_Backoff_Time) {
 						if (Station_Stage[i] < m) {
@@ -141,7 +141,7 @@ void main() {
 				}
 			}
 		}
-		SimulationBasicModelThroughput[num_station - 5] = (double)Successful_Packet_Transmit_Count * PayLoad / Total_Simulation_Time;
+		SimulationBasicModelThroughput[station - 5] = (double)Successful_Packet_Transmit_Count * PayLoad / Total_Simulation_Time;
 	}
 	std::cout << "\tDone\n\n";
 
@@ -183,7 +183,7 @@ void main() {
 	fprintf(gp, "set title '%s' \n", "Throughput");
 	fprintf(gp, "set style line 1 lt 3 pt 7 ps 0.3 lc rgb 'blue' lw 2 \n");
 	fprintf(gp, "set style line 2 lt 3 pt 7 ps 0.3 lc rgb 'red' lw 1 \n");
-	fprintf(gp, "plot '-' w p ls 1, '-' w p ls 2 \n");
+	fprintf(gp, "plot '-' w p ls 1 title 'Theory', '-' w p ls 2 title 'Simulation' \n");
 
 	for (int k = 0; k < x.size(); k++) {
 		fprintf(gp, "%f %f \n", x[k], y1[k]);
