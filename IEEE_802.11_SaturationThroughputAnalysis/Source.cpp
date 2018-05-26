@@ -22,9 +22,7 @@
 
 
 #include <iostream>
-#include <functional>
 #include <vector>
-#include <random>
 #include <algorithm>
 
 #define EPSILON 0.00000001f
@@ -45,11 +43,17 @@ void main() {
 	int PHY_header = 128;		// bits
 	int ack = 112;				// bits
 
+	int RTS = 160 + PHY_header; //bits
+	int CTS = 112 + PHY_header; //bits
+
 	int Packet = MAC_header + PHY_header + PayLoad;			// bits
 	int ACK = 112 + PHY_header;								// bits
 
-	double Ts = Packet + SIFS + prop_delay + ACK + DIFS + prop_delay;
-	double Tc = Packet + DIFS + prop_delay;
+	double Ts_Basic = Packet + SIFS + prop_delay + ACK + DIFS + prop_delay;
+	double Tc_Basic = Packet + DIFS + prop_delay;
+
+	double Ts_RTS = RTS + SIFS + prop_delay + CTS + SIFS + prop_delay + Packet + SIFS + prop_delay + ACK + DIFS + prop_delay;
+	double Tc_RTS = RTS + DIFS + prop_delay;
 
 	// Set the window size and stage number by typing inputs
 	int W = 32;
@@ -60,6 +64,7 @@ void main() {
 	std::cin >> m;
 
 	// Computation
+	std::cout << "Computation Bianchi Throughput Saturation Basic Model...\n";
 	double throughput[50] = {};
 
 	for (int n = 5; n <= 50; n++) {
@@ -71,37 +76,29 @@ void main() {
 		double Ptr = 1.0f - std::pow((1.0f - tau), n);
 		// Ps is the probability that a transmission is successful
 		double Ps = n * tau * (std::pow((1.0f - tau), (n - 1))) / Ptr;	
-		throughput[n - 5] = Ps * Ptr * PayLoad / ((1 - Ptr) * slot_time + Ptr * Ps * Ts + Ptr * (1.0f - Ps) * Tc);
+		throughput[n - 5] = Ps * Ptr * PayLoad / ((1 - Ptr) * slot_time + Ptr * Ps * Ts_Basic + Ptr * (1.0f - Ps) * Tc_Basic);
 	}
-
+	std::cout << "\tDone\n\n";
 
 	
+	// Simulation
+	std::cout << "Simulating Bianchi Throughput Saturation Basic Model...\n";
 	long sim_time = 0;
 	double Simulation_throughput[50] = {};
-	//int j = 0;
-
-	std::default_random_engine generator;
-	std::uniform_real_distribution<double> distribution(0.0, 1.0);
-
-	// Simulation
-	std::cout << "Simulating...\n";
+	std::vector<long> station_stage;
+	std::vector<long> next_tran_time;
 
 	for (int num_station = 5; num_station <= 50; num_station++) {
 		long suc_pkt = 0;
 		long collision_pkt = 0;
-
-		std::vector<long> station_stage;
-		station_stage.resize(num_station, 0);
-
-		std::vector<long> next_tran_time;
+		station_stage.resize(num_station, 0);	
 		next_tran_time.resize(num_station, 0);
 
 		// initial backoff time
 		for (int i = 0; i < num_station; i++) {
 			station_stage[i] = 0;
-			next_tran_time[i] = DIFS + std::floor(W * distribution(generator)) * slot_time;
+			next_tran_time[i] = DIFS + std::floor(W * std::rand() / RAND_MAX) * slot_time;
 		}
-
 
 		while (suc_pkt < 100000) {
 			long tran_time = *std::min_element (next_tran_time.begin(), next_tran_time.end());
@@ -122,7 +119,7 @@ void main() {
 							sim_time = next_tran_time[i] + Packet + SIFS + ACK + DIFS;
 						}
 						station_stage[i] = 0;
-						next_tran_time[i] = next_tran_time[i] + Packet + SIFS + ACK + DIFS + floor(W * distribution(generator)) * slot_time;
+						next_tran_time[i] = next_tran_time[i] + Packet + SIFS + ACK + DIFS + floor(W * std::rand() / RAND_MAX) * slot_time;
 					}
 					// stop counting while the channel is busy
 					else {
@@ -138,7 +135,7 @@ void main() {
 						if (station_stage[i] < m) {
 							station_stage[i]++;
 						}
-						next_tran_time[i] = next_tran_time[i] + Packet + DIFS + floor(std::pow(2.0f, station_stage[i]) * W * distribution(generator)) * slot_time;
+						next_tran_time[i] = next_tran_time[i] + Packet + DIFS + floor(std::pow(2.0f, station_stage[i]) * W * std::rand() / RAND_MAX) * slot_time;
 					}
 					else {
 						next_tran_time[i] = next_tran_time[i] + Packet + DIFS;
@@ -146,26 +143,26 @@ void main() {
 				}
 			}
 		}
-		Simulation_throughput[num_station - 5] = (float)suc_pkt * (PayLoad) / sim_time;
+		Simulation_throughput[num_station - 5] = (double)suc_pkt * PayLoad / sim_time;
 	}
-
+	std::cout << "\tDone\n\n";
 
 	//Plot the results
 	std::vector<float> x;
 	std::vector<float> y1, y2;
 
-	for (int i = 0; i < 50; i++) {
+	for (int i = 5; i <= 50; i++) {
 		x.push_back(i);
-		y1.push_back(throughput[i]);
-		y2.push_back(Simulation_throughput[i]);
+		y1.push_back(throughput[i - 5]);
+		y2.push_back(Simulation_throughput[i - 5]);
 	}
 
 	FILE * gp = _popen("gnuplot", "w");
 	fprintf(gp, "set terminal wxt size 600,400 \n");
 	fprintf(gp, "set grid \n");
 	fprintf(gp, "set title '%s' \n", "Throughput");
-	fprintf(gp, "set style line 1 lt 3 pt 7 ps 0.1 lc rgb 'green' lw 1 \n");
-	fprintf(gp, "set style line 2 lt 3 pt 7 ps 0.1 lc rgb 'red' lw 1 \n");
+	fprintf(gp, "set style line 1 lt 3 pt 7 ps 0.3 lc rgb 'blue' lw 2 \n");
+	fprintf(gp, "set style line 2 lt 3 pt 7 ps 0.3 lc rgb 'red' lw 1 \n");
 	fprintf(gp, "plot '-' w p ls 1, '-' w p ls 2 \n");
 
 	for (int k = 0; k < x.size(); k++) {
